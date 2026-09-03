@@ -17,7 +17,8 @@ export class Attachment {
   task_id: Types.ObjectId;
 
   @Prop({
-    enum: AttachmentType,
+    type: String,
+    enum: Object.values(AttachmentType),
     required: true,
   })
   type: AttachmentType;

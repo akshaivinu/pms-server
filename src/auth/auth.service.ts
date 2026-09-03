@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../users/schemas/user.schema.js';
@@ -11,17 +11,17 @@ import { UserRole } from '../users/enums/users.enum.js';
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectModel(User.name) private readonly userModel: Model<User>,
-    private readonly jwtService: JwtService
+    @InjectModel(User.name) @Optional() private readonly userModel?: Model<User>,
+    @Optional() private readonly jwtService?: JwtService,
   ) { }
 
   async create(user: CreateUserDto) {
-    const existingUser = await this.userModel.findOne({ email: user.email });
+    const existingUser = await this.userModel!.findOne({ email: user.email });
     if (existingUser) {
       throw new ConflictException("User with this email already exists");
     }
     const hashPassword = await bcrypt.hash(user.password, 10);
-    const newUser = new this.userModel({ ...user, password: hashPassword });
+    const newUser = new this.userModel!({ ...user, password: hashPassword });
     newUser.save();
     return {
       success: true,
@@ -30,7 +30,7 @@ export class AuthService {
   }
   
   async login(data: LoginDto) {
-    const user = await this.userModel.findOne({ email: data.email })
+    const user = await this.userModel!.findOne({ email: data.email })
     if (!user) {
       throw new ConflictException("User with this email does not exist");
     }
@@ -46,13 +46,13 @@ export class AuthService {
       organization_id: user.organization_id,
     }
     
-    const token = this.jwtService.sign(payload);
+    const token = this.jwtService!.sign(payload);
 
     return token;
   }
 
   async updateRole(role: UserRole) {
-    const user = await this.userModel.findOne({ email: "vinu@gmail.com" });
+    const user = await this.userModel!.findOne({ email: "vinu@gmail.com" });
     if (!user) {
       throw new ConflictException("User not found");
     }

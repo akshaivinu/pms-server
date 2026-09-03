@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Organization } from './schema/organization.schema.js';
 import { Model } from 'mongoose';
@@ -9,23 +9,45 @@ import { type Request } from 'express';
 export class OrganizationsService {
   constructor(
     @InjectModel(Organization.name)
-    private organizationModel: Model<Organization>,
-  
+    @Optional()
+    private organizationModel?: Model<Organization>,
+
     @InjectModel(User.name)
-    private userModel: Model<User>,
+    @Optional()
+    private userModel?: Model<User>,
   ) {}
 
   async createOrganization(data: Organization, req: Request) {
-    const createdOrganization = await this.organizationModel.create({
-      name: data.name
+    const createdOrganization = await this.organizationModel!.create({
+      name: data.name,
     });
-    
-    await this.userModel.findOneAndUpdate(
+
+    await this.userModel!.findOneAndUpdate(
       // @ts-ignore
       { _id: req?.user?.userId },
-      { organization_id: createdOrganization._id }
+      { organization_id: createdOrganization._id },
     );
+
     return createdOrganization;
   }
-  
+
+  async findOne(organizationId: string) {
+    const organization = await this.organizationModel!.findById(organizationId).exec();
+    if (!organization) {
+      return { success: false, message: 'Organization not found' };
+    }
+
+    return { success: true, data: organization };
+  }
+
+  async update(organizationId: string, data: Partial<Organization>) {
+    const organization = await this.organizationModel!
+      .findByIdAndUpdate(organizationId, data, { new: true })
+      .exec();
+
+    return {
+      success: true,
+      data: organization,
+    };
+  }
 }
