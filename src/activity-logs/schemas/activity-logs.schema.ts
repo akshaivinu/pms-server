@@ -35,13 +35,15 @@ export class ActivityLog {
   user_id: Types.ObjectId;
 
   @Prop({
-    enum: ActivityAction,
+    type: String,
+    enum: Object.values(ActivityAction),
     required: true,
   })
   action: ActivityAction;
 
   @Prop({
-    enum: ActivityEntityType,
+    type: String,
+    enum: Object.values(ActivityEntityType),
     required: true,
   })
   entity_type: ActivityEntityType;

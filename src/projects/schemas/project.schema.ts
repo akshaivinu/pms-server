@@ -26,7 +26,8 @@ export class Project {
   description: string;
 
   @Prop({
-    enum: ProjectStatus,
+    type: String,
+    enum: Object.values(ProjectStatus),
     default: ProjectStatus.ACTIVE,
   })
   status: ProjectStatus;
