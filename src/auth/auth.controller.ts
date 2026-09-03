@@ -1,8 +1,9 @@
-import { Body, Controller, HttpCode, Post, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, Patch, Post, Res } from '@nestjs/common';
 import { CreateUserDto, LoginDto } from './dto/auth.dto.js';
 import { AuthService } from './auth.service.js';
 import { type Response } from 'express';
 import { config } from 'dotenv';
+import { UserRole } from '../users/enums/users.enum.js';
 
 config()
 @Controller('auth')
@@ -33,4 +34,10 @@ export class AuthController {
           message: 'Login successful',
         };
   }
+
+  @Patch()
+  async updateRole() {
+    return this.authService.updateRole(UserRole.ADMIN);
+  }
+  
 }

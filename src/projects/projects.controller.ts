@@ -2,6 +2,8 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Get,
+  Param,
   Post,
   Req,
   UseGuards,
@@ -31,18 +33,44 @@ export class ProjectsController {
     @Req() request: Request,
   ) {
     // @ts-ignore
-    const organizationId = new Types.ObjectId(request.user?.organization_id);
-
+    const organizationId = request.user?.organization_id;
+    
     if (!organizationId) {
-       throw new BadRequestException(
-         'User does not belong to an organization',
-       );
-     }
-
+      throw new BadRequestException(
+        'User does not belong to an organization',
+      );
+    }
+    // @ts-ignore
+    const organizationObjectId = new Types.ObjectId(request.user?.organization_id);
+    
     return this.projectsService.create(
       data.name,
       data.description,
+      organizationObjectId,
+    );
+  }
+
+  @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  async getProject(
+    @Param('id') projectId: string,
+    @Req() request: Request,
+  ) {
+    // @ts-ignore
+    const organizationId = request.user?.organization_id;
+    
+    if (!organizationId) {
+      throw new BadRequestException(
+        'User does not belong to an organization',
+      );
+    }
+    // @ts-ignore
+    const organizationObjectId = new Types.ObjectId(request.user?.organization_id);
+  
+    return this.projectsService.findOne(
+      projectId,
       organizationId,
     );
   }
+  
 }

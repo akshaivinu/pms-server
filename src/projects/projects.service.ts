@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Project } from './schemas/project.schema.js';
@@ -23,4 +23,21 @@ export class ProjectsService {
 
     return project;
   }
+
+  async findOne(
+      projectId: string,
+      organizationId: Types.ObjectId,
+    ) {
+      const project = await this.projectModel.findOne({
+        _id: projectId,
+        organization_id: organizationId,
+      });
+  
+      if (!project) {
+        throw new NotFoundException('Project not found');
+      }
+  
+      return project;
+    }
+  
 }

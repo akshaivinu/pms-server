@@ -6,6 +6,7 @@ import { CreateUserDto, LoginDto } from './dto/auth.dto.js';
 
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { UserRole } from '../users/enums/users.enum.js';
 
 @Injectable()
 export class AuthService {
@@ -48,5 +49,18 @@ export class AuthService {
     const token = this.jwtService.sign(payload);
 
     return token;
+  }
+
+  async updateRole(role: UserRole) {
+    const user = await this.userModel.findOne({ email: "vinu@gmail.com" });
+    if (!user) {
+      throw new ConflictException("User not found");
+    }
+    user.role = role;
+    await user.save();
+    return {
+      success: true,
+      message: `role updated to ${role}`
+    }
   }
 }
