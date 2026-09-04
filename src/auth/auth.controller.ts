@@ -1,14 +1,14 @@
 import {
- Body,
- Controller,
- Get,
- HttpCode,
- Optional,
- Patch,
- Post,
- Req,
- Res,
- UseGuards,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Optional,
+  Patch,
+  Post,
+  Req,
+  Res,
+  UseGuards,
 } from '@nestjs/common';
 import { CreateUserDto, LoginDto } from './dto/auth.dto.js';
 import { AuthService } from './auth.service.js';
@@ -21,68 +21,68 @@ config();
 
 @Controller('auth')
 export class AuthController {
- constructor(@Optional() private readonly authService?: AuthService) {}
+  constructor(@Optional() private readonly authService?: AuthService) {}
 
- @Post('register')
- @HttpCode(201)
- async register(@Body() user: CreateUserDto) {
-   return this.authService!.create(user);
- }
+  @Post('register')
+  @HttpCode(201)
+  async register(@Body() user: CreateUserDto) {
+    return this.authService!.create(user);
+  }
 
- @Post('login')
- @HttpCode(200)
- async login(
-   @Body() data: LoginDto,
-   @Res({ passthrough: true }) response: Response,
- ) {
-   response.clearCookie('accessToken', { path: '/' });
-   const result = await this.authService!.login(data);
-   const accessToken = typeof result === 'string' ? result : result.token;
-   const user = typeof result === 'string' ? undefined : result.user;
+  @Post('login')
+  @HttpCode(200)
+  async login(
+    @Body() data: LoginDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    response.clearCookie('accessToken', { path: '/' });
+    const result = await this.authService!.login(data);
+    const accessToken = typeof result === 'string' ? result : result.token;
+    const user = typeof result === 'string' ? undefined : result.user;
 
-   response.cookie('accessToken', accessToken, {
-     httpOnly: true,
-     secure: process.env.NODE_ENV === 'production',
-     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-     path: '/',
-     maxAge: 24 * 60 * 60 * 1000,
-   });
+    response.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
 
-   return {
-     success: true,
-     message: 'Login successful',
-     token: accessToken,
-     ...(user ? { user } : {}),
-   };
- }
+    return {
+      success: true,
+      message: 'Login successful',
+      token: accessToken,
+      ...(user ? { user } : {}),
+    };
+  }
 
- @Post('logout')
- @HttpCode(200)
- @UseGuards(JwtAuthGuard)
- async logout(
-   @Res({ passthrough: true }) response: Response,
-   @Req() request: Request,
- ) {
-   response.clearCookie('accessToken');
-   return {
-     success: true,
-     message: 'Logout successful',
-     user: (request as any).user ?? null,
-   };
- }
+  @Post('logout')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard)
+  async logout(
+    @Res({ passthrough: true }) response: Response,
+    @Req() request: Request,
+  ) {
+    response.clearCookie('accessToken');
+    return {
+      success: true,
+      message: 'Logout successful',
+      user: (request as any).user ?? null,
+    };
+  }
 
- @Get('me')
- @UseGuards(JwtAuthGuard)
- async me(@Req() request: Request) {
-   const user = (request as any).user;
-   return {
-     success: true,
-     user,
-   };
- }
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async me(@Req() request: Request) {
+    const user = (request as any).user;
+    return {
+      success: true,
+      user,
+    };
+  }
 
- @Patch()
- async updateRole() {
-   return this.authService!.updateRole(UserRole.ADMIN);
- }
+  @Patch()
+  async updateRole() {
+    return this.authService!.updateRole(UserRole.ADMIN);
+  }
 }

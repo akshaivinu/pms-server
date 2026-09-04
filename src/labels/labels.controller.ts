@@ -26,7 +26,8 @@ export class LabelsController {
   @Post('labels')
   async createLabel(@Req() req: Request, @Body() body: { name: string }) {
     const organizationId = (req as any).user?.organization_id;
-    return this.labelsService!.createLabel(organizationId, body.name);
+    const userId = (req as any).user?.userId;
+    return this.labelsService!.createLabel(organizationId, body.name, userId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -39,15 +40,39 @@ export class LabelsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Patch('labels/:labelId')
-  async updateLabel(@Param('labelId') labelId: string, @Body() body: Partial<{ name: string }>) {
-    return this.labelsService!.updateLabel(labelId, body);
+  async updateLabel(
+    @Param('labelId') labelId: string,
+    @Body() body: Partial<{ name: string }>,
+    @Req() req: Request,
+  ) {
+    return this.labelsService!.updateLabel(
+      labelId,
+      body,
+      (req as any).user?.organization_id,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Delete('labels/:labelId')
-  async deleteLabel(@Param('labelId') labelId: string) {
-    return this.labelsService!.deleteLabel(labelId);
+  async deleteLabel(@Param('labelId') labelId: string, @Req() req: Request) {
+    return this.labelsService!.deleteLabel(
+      labelId,
+      (req as any).user?.organization_id,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('tasks/:taskId/labels')
+  async getLabelsForTask(@Param('taskId') taskId: string, @Req() req: Request) {
+    const user = (req as any).user;
+    const labels = await this.labelsService!.getLabelsForTask(
+      taskId,
+      user?.userId,
+      user?.role,
+      user?.organization_id,
+    );
+    return labels;
   }
 
   @UseGuards(JwtAuthGuard)
@@ -55,8 +80,16 @@ export class LabelsController {
   async assignLabelToTask(
     @Param('taskId') taskId: string,
     @Body() body: { labelId: string },
+    @Req() req: Request,
   ) {
-    return this.labelsService!.assignLabel(taskId, body.labelId);
+    const user = (req as any).user;
+    return this.labelsService!.assignLabel(
+      taskId,
+      body.labelId,
+      user?.userId,
+      user?.role,
+      user?.organization_id,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
@@ -64,7 +97,15 @@ export class LabelsController {
   async removeLabelFromTask(
     @Param('taskId') taskId: string,
     @Param('labelId') labelId: string,
+    @Req() req: Request,
   ) {
-    return this.labelsService!.removeLabel(taskId, labelId);
+    const user = (req as any).user;
+    return this.labelsService!.removeLabel(
+      taskId,
+      labelId,
+      user?.userId,
+      user?.role,
+      user?.organization_id,
+    );
   }
 }

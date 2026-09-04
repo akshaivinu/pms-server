@@ -1,12 +1,11 @@
-import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { HydratedDocument, Types } from "mongoose";
-import { UserRole } from "../enums/users.enum.js";
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { HydratedDocument, Types } from 'mongoose';
+import { UserRole } from '../enums/users.enum.js';
 
 export type UserDocument = HydratedDocument<User>;
 
 @Schema({ timestamps: true })
 export class User {
-
   @Prop()
   organization_id: Types.ObjectId;
 
@@ -19,9 +18,12 @@ export class User {
   @Prop({ required: true })
   password: string;
 
-  @Prop({ type: String, enum: Object.values(UserRole), default: UserRole.MEMBER })
+  @Prop({
+    type: String,
+    enum: Object.values(UserRole),
+    default: UserRole.MEMBER,
+  })
   role: UserRole;
-  
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

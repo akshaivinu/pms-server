@@ -53,7 +53,10 @@ describe('AuthService', () => {
       });
 
       await expect(
-        service.login({ email: 'test@example.com', password: 'wrongPassword456' }),
+        service.login({
+          email: 'test@example.com',
+          password: 'wrongPassword456',
+        }),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -61,7 +64,10 @@ describe('AuthService', () => {
       mockUserModel.findOne.mockResolvedValue(null);
 
       await expect(
-        service.login({ email: 'nonexistent@example.com', password: 'somePassword' }),
+        service.login({
+          email: 'nonexistent@example.com',
+          password: 'somePassword',
+        }),
       ).rejects.toThrow(UnauthorizedException);
     });
 
@@ -76,7 +82,10 @@ describe('AuthService', () => {
         organization_id: 'org123',
       });
 
-      const result = await service.login({ email: 'test@example.com', password: 'correctPassword123' });
+      const result = await service.login({
+        email: 'test@example.com',
+        password: 'correctPassword123',
+      });
       expect(result.token).toBe('mock-jwt-token');
       expect(result.user.email).toBe('test@example.com');
       expect(result.user.name).toBe('Test User');

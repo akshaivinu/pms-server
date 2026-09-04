@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config'
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { MongooseModule } from '@nestjs/mongoose';
@@ -12,12 +12,13 @@ import { LabelsModule } from './labels/labels.module.js';
 import { AttachmentsModule } from './attachments/attachments.module.js';
 import { ActivityLogsModule } from './activity-logs/activity-logs.module.js';
 import { WorkflowsModule } from './workflows/workflows.module.js';
-
+import { Task, TaskSchema } from './tasks/schemas/task.schema.js';
+import { Project, ProjectSchema } from './projects/schemas/project.schema.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
-      isGlobal: true
+      isGlobal: true,
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
@@ -28,6 +29,10 @@ import { WorkflowsModule } from './workflows/workflows.module.js';
         };
       },
     }),
+    MongooseModule.forFeature([
+      { name: Task.name, schema: TaskSchema },
+      { name: Project.name, schema: ProjectSchema },
+    ]),
     UsersModule,
     AuthModule,
     OrganizationsModule,

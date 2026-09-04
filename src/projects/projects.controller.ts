@@ -21,9 +21,7 @@ import { Types } from 'mongoose';
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(
-    @Optional() private readonly projectsService?: ProjectsService,
-  ) {}
+  constructor(@Optional() private readonly projectsService?: ProjectsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -55,7 +53,11 @@ export class ProjectsController {
       throw new BadRequestException('User does not belong to an organization');
     }
     const organizationObjectId = new Types.ObjectId(organizationId);
-    return this.projectsService!.findAll(organizationObjectId, (request as any).user?.userId, (request as any).user?.role);
+    return this.projectsService!.findAll(
+      organizationObjectId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+    );
   }
 
   @Get(':projectId')
@@ -70,8 +72,15 @@ export class ProjectsController {
     }
 
     const projectObjectId = new Types.ObjectId(projectId);
-    await this.projectsService!.assertCanAccess(projectObjectId, (request as any).user?.userId, (request as any).user?.role);
-    return this.projectsService!.findOne(projectObjectId, new Types.ObjectId(organizationId));
+    await this.projectsService!.assertCanAccess(
+      projectObjectId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+    );
+    return this.projectsService!.findOne(
+      projectObjectId,
+      new Types.ObjectId(organizationId),
+    );
   }
 
   @Patch(':projectId')
@@ -82,32 +91,64 @@ export class ProjectsController {
     @Body() data: Record<string, unknown>,
     @Req() request: Request,
   ) {
-    await this.projectsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.role);
+    const organizationId = (request as any).user?.organization_id;
+    await this.projectsService!.assertCanManage(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      organizationId,
+    );
     return this.projectsService!.update(projectId, data);
   }
 
   @Delete(':projectId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async deleteProject(@Param('projectId') projectId: Types.ObjectId, @Req() request: Request) {
-    await this.projectsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.role);
+  async deleteProject(
+    @Param('projectId') projectId: Types.ObjectId,
+    @Req() request: Request,
+  ) {
+    const organizationId = (request as any).user?.organization_id;
+    await this.projectsService!.assertCanManage(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      organizationId,
+    );
     return this.projectsService!.remove(projectId);
   }
 
   @Post(':projectId/archive')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async archiveProject(@Param('projectId') projectId: Types.ObjectId, @Req() request: Request) {
-    await this.projectsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.role);
+  async archiveProject(
+    @Param('projectId') projectId: Types.ObjectId,
+    @Req() request: Request,
+  ) {
+    const organizationId = (request as any).user?.organization_id;
+    await this.projectsService!.assertCanManage(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      organizationId,
+    );
     return this.projectsService!.archive(projectId);
   }
 
   @Get(':projectId/members')
   @UseGuards(JwtAuthGuard)
-  async listProjectMembers(@Param('projectId') projectId: string, @Req() request: Request) {
+  async listProjectMembers(
+    @Param('projectId') projectId: string,
+    @Req() request: Request,
+  ) {
     const organizationId = (request as any).user?.organization_id;
-    if (!organizationId) throw new BadRequestException('User does not belong to an organization');
-    await this.projectsService!.assertProjectOrganization(new Types.ObjectId(projectId), organizationId);
+    if (!organizationId)
+      throw new BadRequestException('User does not belong to an organization');
+    await this.projectsService!.assertCanAccess(
+      new Types.ObjectId(projectId),
+      (request as any).user?.userId,
+      (request as any).user?.role,
+    );
     return this.projectsService!.listMembers(new Types.ObjectId(projectId));
   }
 
@@ -128,6 +169,7 @@ export class ProjectsController {
       body.email,
       new Types.ObjectId(organizationId),
       body.projectRole,
+      (request as any).user?.userId,
     );
   }
 
@@ -138,8 +180,20 @@ export class ProjectsController {
     @Param('projectId') projectId: Types.ObjectId,
     @Param('userId') userId: string,
     @Body() body: { projectRole: string },
+    @Req() request: Request,
   ) {
-    return this.projectsService!.updateMember(projectId, userId, body.projectRole);
+    const organizationId = (request as any).user?.organization_id;
+    await this.projectsService!.assertCanManage(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      organizationId,
+    );
+    return this.projectsService!.updateMember(
+      projectId,
+      userId,
+      body.projectRole,
+    );
   }
 
   @Delete(':projectId/members/:userId')
@@ -148,7 +202,15 @@ export class ProjectsController {
   async removeProjectMember(
     @Param('projectId') projectId: Types.ObjectId,
     @Param('userId') userId: string,
+    @Req() request: Request,
   ) {
+    const organizationId = (request as any).user?.organization_id;
+    await this.projectsService!.assertCanManage(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      organizationId,
+    );
     return this.projectsService!.removeMember(projectId, userId);
   }
 }

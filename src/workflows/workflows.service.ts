@@ -1,125 +1,179 @@
 import { ForbiddenException, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Types } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Workflow } from './schemas/workflow.schema.js';
 import { WorkflowStage } from './schemas/workflow-stage.schema.js';
 import { ProjectMember } from '../projects/schemas/project-member.schema.js';
 import { User } from '../users/schemas/user.schema.js';
 import { Project } from '../projects/schemas/project.schema.js';
+import { ActivityLogsService } from '../activity-logs/activity-logs.service.js';
 
 @Injectable()
 export class WorkflowsService {
   constructor(
-    @InjectModel(Workflow.name) @Optional() private readonly workflowModel?: Model<Workflow>,
-    @InjectModel(WorkflowStage.name) @Optional() private readonly stageModel?: Model<WorkflowStage>,
-    @InjectModel(ProjectMember.name) @Optional() private readonly projectMemberModel?: Model<ProjectMember>,
-    @InjectModel(User.name) @Optional() private readonly userModel?: Model<User>,
-    @InjectModel(Project.name) @Optional() private readonly projectModel?: Model<Project>,
+    @InjectModel(Workflow.name) @Optional() private wfModel?: Model<Workflow>,
+    @InjectModel(WorkflowStage.name)
+    @Optional()
+    private stageModel?: Model<WorkflowStage>,
+    @InjectModel(ProjectMember.name)
+    @Optional()
+    private memberModel?: Model<ProjectMember>,
+    @InjectModel(User.name) @Optional() private userModel?: Model<User>,
+    @InjectModel(Project.name)
+    @Optional()
+    private projectModel?: Model<Project>,
+    private activity?: ActivityLogsService,
   ) {}
 
-  async assertCanManage(projectId: string, userId: string, organizationId?: string) {
-    const project = await this.projectModel!.findById(projectId).select('organization_id').lean().exec();
-    if (!project || (organizationId && String(project.organization_id) !== organizationId)) {
-      throw new ForbiddenException('You cannot manage this project workflow');
-    }
-    const user = await this.userModel!.findById(userId).select('role').lean().exec();
-    if (user?.role === 'admin') return;
-    const membership = await this.projectMemberModel!.findOne({
-      project_id: projectId,
-      user_id: userId,
-      project_role: { $in: ['MANAGER', 'PROJECT_MANAGER', 'manager', 'project_manager'] },
-    }).lean().exec();
-    if (!membership) throw new ForbiddenException('You cannot manage this project workflow');
-  }
-
-  async assertCanAccess(projectId: string, userId: string, role: string, organizationId?: string) {
-    const project = await this.projectModel!.findById(projectId).select('organization_id').lean().exec();
-    if (!project || (organizationId && String(project.organization_id) !== organizationId)) {
-      throw new ForbiddenException('You do not have access to this project workflow');
-    }
+  private async assertAccess(
+    projectId: string,
+    userId: string,
+    role: string,
+    orgId?: string,
+    manageOnly = false,
+  ) {
+    const project = await this.projectModel!.findById(projectId)
+      .select('organization_id')
+      .lean();
+    if (!project || (orgId && String(project.organization_id) !== orgId))
+      throw new ForbiddenException('Access denied');
     if (role === 'admin') return;
-    const membership = await this.projectMemberModel!.findOne({
-      project_id: projectId,
-      user_id: userId,
-      ...(role === 'manager' ? { project_role: { $in: ['MANAGER', 'PROJECT_MANAGER', 'manager', 'project_manager'] } } : {}),
-    }).lean().exec();
-    if (!membership) throw new ForbiddenException('You do not have access to this project workflow');
+    if (!manageOnly && role === 'manager') return;
+    const member = await this.memberModel!.findOne({
+      project_id: new Types.ObjectId(projectId),
+      user_id: new Types.ObjectId(userId),
+      ...(!manageOnly
+        ? {}
+        : {
+            project_role: {
+              $in: ['MANAGER', 'PROJECT_MANAGER', 'manager', 'project_manager'],
+            },
+          }),
+    }).lean();
+    if (!member) throw new ForbiddenException('Access denied');
   }
 
-  async createWorkflow(projectId: string, data: Partial<Workflow>) {
-    const workflow = await this.workflowModel!.findOneAndUpdate(
+  async assertCanManage(projectId: string, userId: string, orgId?: string) {
+    const user = await this.userModel!.findById(userId).select('role').lean();
+    if (user?.role === 'admin') return;
+    await this.assertAccess(projectId, userId, 'member', orgId, true);
+  }
+
+  async assertCanAccess(
+    projectId: string,
+    userId: string,
+    role: string,
+    orgId?: string,
+  ) {
+    await this.assertAccess(projectId, userId, role, orgId);
+  }
+
+  async createWorkflow(
+    projectId: string,
+    data: Partial<Workflow>,
+    userId?: string,
+    orgId?: string,
+  ) {
+    const wf = await this.wfModel!.findOneAndUpdate(
       { project_id: projectId },
       { project_id: projectId, name: data.name ?? 'Default workflow', ...data },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    ).exec();
-    const stages = await this.ensureStages(workflow._id);
-    return { success: true, data: { ...workflow.toObject(), stages } };
+      { upsert: true, new: true },
+    );
+    const stages = await this.ensureStages(wf._id);
+    if (userId && orgId) {
+      const project = await this.projectModel!.findById(projectId)
+        .select('name')
+        .lean();
+      this.activity?.logActivity({
+        organizationId: orgId,
+        userId,
+        action: 'create',
+        entityType: 'workflow',
+        entityId: wf._id,
+        details: {
+          title: data.name ?? 'Default workflow',
+          projectName: project?.name,
+        },
+      });
+    }
+    return { success: true, data: { ...wf.toObject(), stages } };
   }
 
   async getWorkflow(projectId: string) {
-    const workflow = await this.workflowModel!.findOne({ project_id: projectId }).exec();
-    if (!workflow) return { success: true, data: null };
-    const stages = await this.stageModel!.find({ workflow_id: workflow._id }).sort({ position: 1 }).exec();
-    return { success: true, data: { ...workflow.toObject(), stages } };
+    const wf = await this.wfModel!.findOne({ project_id: projectId });
+    if (!wf) return { success: true, data: null };
+    const stages = await this.stageModel!.find({ workflow_id: wf._id }).sort({
+      position: 1,
+    });
+    return { success: true, data: { ...wf.toObject(), stages } };
   }
 
   async updateWorkflow(projectId: string, data: Partial<Workflow>) {
-    const workflow = await this.workflowModel!.findOneAndUpdate(
-      { project_id: projectId },
-      data,
-      { new: true },
-    );
-    return { success: true, data: workflow };
+    return {
+      success: true,
+      data: await this.wfModel!.findOneAndUpdate(
+        { project_id: projectId },
+        data,
+        { new: true },
+      ),
+    };
   }
 
-  async createStage(projectId: string, data: { name: string; position: number }) {
-    const workflow = await this.workflowModel!.findOneAndUpdate(
+  async createStage(
+    projectId: string,
+    data: { name: string; position: number },
+  ) {
+    const wf = await this.wfModel!.findOneAndUpdate(
       { project_id: projectId },
       { $setOnInsert: { project_id: projectId, name: 'Default workflow' } },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    ).exec();
-    const stage = await this.stageModel!.create({
-      workflow_id: workflow._id,
+      { upsert: true, new: true },
+    );
+    await this.stageModel!.create({
+      workflow_id: wf._id,
       name: data.name,
       position: data.position,
     });
-    const stages = await this.ensureStages(workflow._id);
-    return { success: true, data: { ...workflow.toObject(), stages } };
+    const stages = await this.ensureStages(wf._id);
+    return { success: true, data: { ...wf.toObject(), stages } };
   }
 
   private async ensureStages(workflowId: Types.ObjectId) {
-    const existingStages = await this.stageModel!
-      .find({ workflow_id: workflowId })
-      .sort({ position: 1 })
-      .exec();
-    if (existingStages.length) return existingStages;
-
+    const existing = await this.stageModel!.find({
+      workflow_id: workflowId,
+    }).sort({ position: 1 });
+    if (existing.length) return existing;
     return this.stageModel!.insertMany(
       ['Backlog', 'Planning', 'In Progress', 'Review', 'Completed'].map(
-        (name, position) => ({ workflow_id: workflowId, name, position }),
+        (name, i) => ({ workflow_id: workflowId, name, position: i }),
       ),
     );
   }
 
   async updateStage(stageId: string, data: Partial<WorkflowStage>) {
-    const stage = await this.stageModel!.findByIdAndUpdate(stageId, data, { new: true }).exec();
-    return { success: true, data: stage };
+    return {
+      success: true,
+      data: await this.stageModel!.findByIdAndUpdate(stageId, data, {
+        new: true,
+      }),
+    };
   }
 
   async deleteStage(stageId: string) {
-    const stage = await this.stageModel!.findByIdAndDelete(stageId).exec();
-    return { success: true, data: stage };
+    return {
+      success: true,
+      data: await this.stageModel!.findByIdAndDelete(stageId),
+    };
   }
 
-  async reorderStages(projectId: string, stages: Array<{ id: string; position: number }>) {
+  async reorderStages(
+    projectId: string,
+    stages: Array<{ id: string; position: number }>,
+  ) {
     await Promise.all(
-      stages.map((item) =>
-        this.stageModel!.findByIdAndUpdate(item.id, { position: item.position }).exec(),
+      stages.map((s) =>
+        this.stageModel!.findByIdAndUpdate(s.id, { position: s.position }),
       ),
     );
-
-    const workflow = await this.getWorkflow(projectId);
-    return { success: true, data: workflow.data };
+    return this.getWorkflow(projectId);
   }
 }

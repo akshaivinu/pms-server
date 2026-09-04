@@ -1,158 +1,274 @@
 import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Task } from './schemas/task.schema.js';
 import { TaskDependency } from './schemas/task-dependency.schema.js';
 import { Workflow } from '../workflows/schemas/workflow.schema.js';
 import { WorkflowStage } from '../workflows/schemas/workflow-stage.schema.js';
 import { Project } from '../projects/schemas/project.schema.js';
-import { ActivityLog } from '../activity-logs/schemas/activity-logs.schema.js';
-import { ActivityAction, ActivityEntityType } from '../activity-logs/schemas/activity-logs.schema.js';
+import {
+  ActivityLog,
+  ActivityAction,
+  ActivityEntityType,
+} from '../activity-logs/schemas/activity-logs.schema.js';
 import { ProjectMember } from '../projects/schemas/project-member.schema.js';
 
 @Injectable()
 export class TasksService {
   constructor(
-    @InjectModel(Task.name) @Optional() private readonly taskModel?: Model<Task>,
-    @InjectModel(TaskDependency.name) @Optional() private readonly taskDependencyModel?: Model<TaskDependency>,
-    @InjectModel(Workflow.name) @Optional() private readonly workflowModel?: Model<Workflow>,
-    @InjectModel(WorkflowStage.name) @Optional() private readonly workflowStageModel?: Model<WorkflowStage>,
-    @InjectModel(Project.name) @Optional() private readonly projectModel?: Model<Project>,
-    @InjectModel(ActivityLog.name) @Optional() private readonly activityLogModel?: Model<ActivityLog>,
-    @InjectModel(ProjectMember.name) @Optional() private readonly projectMemberModel?: Model<ProjectMember>,
+    @InjectModel(Task.name) @Optional() private taskModel?: Model<Task>,
+    @InjectModel(TaskDependency.name)
+    @Optional()
+    private depModel?: Model<TaskDependency>,
+    @InjectModel(Workflow.name)
+    @Optional()
+    private workflowModel?: Model<Workflow>,
+    @InjectModel(WorkflowStage.name)
+    @Optional()
+    private stageModel?: Model<WorkflowStage>,
+    @InjectModel(Project.name)
+    @Optional()
+    private projectModel?: Model<Project>,
+    @InjectModel(ActivityLog.name)
+    @Optional()
+    private activityModel?: Model<ActivityLog>,
+    @InjectModel(ProjectMember.name)
+    @Optional()
+    private memberModel?: Model<ProjectMember>,
   ) {}
 
-  async assertCanManageTask(taskId: string, userId: string, role: string) {
-    if (role === 'admin') return;
-    const task = await this.taskModel!.findById(taskId).select('project_id').lean().exec();
-    const membership = task && await this.projectMemberModel!.findOne({
-      project_id: task.project_id,
-      user_id: userId,
-      project_role: { $in: ['MANAGER', 'PROJECT_MANAGER', 'manager', 'project_manager'] },
-    }).lean().exec();
-    if (!membership) throw new BadRequestException('You cannot manage tasks in this project');
-  }
-
-  async assertCanAccessProject(projectId: string, userId: string, role: string, organizationId?: string) {
-    const project = await this.projectModel!.findById(projectId).select('organization_id').lean().exec();
-    if (!project || (organizationId && String(project.organization_id) !== organizationId)) {
+  async assertCanAccessProject(
+    projectId: string,
+    userId: string,
+    role: string,
+    orgId?: string,
+  ) {
+    const project = await this.projectModel!.findById(projectId)
+      .select('organization_id')
+      .lean();
+    if (!project || (orgId && String(project.organization_id) !== orgId)) {
       throw new BadRequestException('You do not have access to this project');
     }
+    if (role === 'admin' || role === 'manager') return;
+    const member = await this.memberModel!.findOne({
+      project_id: new Types.ObjectId(projectId),
+      user_id: new Types.ObjectId(userId),
+    }).lean();
+    if (!member)
+      throw new BadRequestException('You do not have access to this project');
+  }
+
+  async assertCanAccessTask(
+    taskId: string,
+    userId: string,
+    role: string,
+    orgId?: string,
+  ) {
+    const task = await this.taskModel!.findById(taskId)
+      .select('project_id')
+      .lean();
+    if (!task) throw new BadRequestException('Task not found');
+    await this.assertCanAccessProject(
+      String(task.project_id),
+      userId,
+      role,
+      orgId,
+    );
+  }
+
+  async assertCanManageTask(
+    taskId: string,
+    userId: string,
+    role: string,
+    orgId?: string,
+  ) {
     if (role === 'admin') return;
-    const membership = await this.projectMemberModel!.findOne({
-      project_id: projectId,
-      user_id: userId,
-      ...(role === 'manager' ? { project_role: { $in: ['MANAGER', 'PROJECT_MANAGER', 'manager', 'project_manager'] } } : {}),
-    }).lean().exec();
-    if (!membership) throw new BadRequestException('You do not have access to this project');
+    const task = await this.taskModel!.findById(taskId)
+      .select('project_id')
+      .lean();
+    if (!task) throw new BadRequestException('Task not found');
+    await this.assertCanAccessProject(
+      String(task.project_id),
+      userId,
+      role,
+      orgId,
+    );
+    const member = await this.memberModel!.findOne({
+      project_id: new Types.ObjectId(String(task.project_id)),
+      user_id: new Types.ObjectId(userId),
+      project_role: {
+        $in: ['MANAGER', 'PROJECT_MANAGER', 'manager', 'project_manager'],
+      },
+    }).lean();
+    if (!member)
+      throw new BadRequestException('You cannot manage tasks in this project');
   }
 
   async createTask(projectId: string, data: Partial<Task>, actorId?: string) {
-    let workflowStageId = data.workflow_stage_id;
-    if (!workflowStageId) {
-      let workflow = await this.workflowModel!.findOne({ project_id: projectId }).exec();
-      if (!workflow) {
-        workflow = await this.workflowModel!.create({ project_id: projectId });
-      }
-
-      let firstStage = await this.workflowStageModel!
-        .findOne({ workflow_id: workflow._id })
-        .sort({ position: 1 })
-        .exec();
-      if (!firstStage) {
-        const defaultStages = await this.workflowStageModel!.insertMany(
+    let stageId = data.workflow_stage_id;
+    if (!stageId) {
+      let wf = await this.workflowModel!.findOne({ project_id: projectId });
+      if (!wf) wf = await this.workflowModel!.create({ project_id: projectId });
+      let stage = await this.stageModel!.findOne({ workflow_id: wf._id }).sort({
+        position: 1,
+      });
+      if (!stage) {
+        const stages = await this.stageModel!.insertMany(
           ['Backlog', 'Planning', 'In Progress', 'Review', 'Completed'].map(
-            (name, position) => ({ workflow_id: workflow!._id, name, position }),
+            (name, i) => ({ workflow_id: wf!._id, name, position: i }),
           ),
         );
-        firstStage = defaultStages[0];
+        stage = stages[0];
       }
-      workflowStageId = firstStage._id;
+      stageId = stage._id;
     }
-
-    if (!workflowStageId) {
-      throw new BadRequestException('A workflow stage is required to create a task');
-    }
-
+    if (!stageId) throw new BadRequestException('Workflow stage required');
     const task = await this.taskModel!.create({
       project_id: projectId,
       ...data,
-      workflow_stage_id: workflowStageId,
+      workflow_stage_id: stageId,
     });
-    await this.recordActivity(projectId, actorId, ActivityAction.CREATE, ActivityEntityType.TASK, task._id, { title: task.title });
+    this.logActivity(projectId, actorId, 'create', 'task', task._id, {
+      title: task.title,
+    });
     return { success: true, data: task };
   }
 
   async listTasks(projectId: string) {
-    const tasks = await this.taskModel!.find({ project_id: projectId }).exec();
-    return { success: true, data: tasks };
+    return {
+      success: true,
+      data: await this.taskModel!.find({ project_id: projectId }),
+    };
   }
 
   async findTask(taskId: string) {
-    const task = await this.taskModel!.findById(taskId).exec();
-    return { success: true, data: task };
+    return { success: true, data: await this.taskModel!.findById(taskId) };
   }
 
   async updateTask(taskId: string, data: Partial<Task>) {
-    const task = await this.taskModel!.findByIdAndUpdate(taskId, data, { new: true }).exec();
-    return { success: true, data: task };
+    return {
+      success: true,
+      data: await this.taskModel!.findByIdAndUpdate(taskId, data, {
+        new: true,
+      }),
+    };
   }
 
   async deleteTask(taskId: string) {
-    const task = await this.taskModel!.findByIdAndDelete(taskId).exec();
+    return {
+      success: true,
+      data: await this.taskModel!.findByIdAndDelete(taskId),
+    };
+  }
+
+  async updateAssignee(
+    taskId: string,
+    assigneeId: string | null,
+    actorId?: string,
+  ) {
+    const task = await this.taskModel!.findByIdAndUpdate(
+      taskId,
+      { assignee_id: assigneeId },
+      { new: true },
+    );
+    if (task)
+      this.logActivity(
+        String(task.project_id),
+        actorId,
+        'assigned',
+        'task',
+        task._id,
+        { assigneeId },
+      );
     return { success: true, data: task };
   }
 
-  async updateAssignee(taskId: string, assigneeId: string | null, actorId?: string) {
-    const task = await this.taskModel!.findByIdAndUpdate(taskId, { assignee_id: assigneeId }, { new: true }).exec();
-    if (task) await this.recordActivity(String(task.project_id), actorId, ActivityAction.ASSIGNED, ActivityEntityType.TASK, task._id, { assigneeId });
-    return { success: true, data: task };
-  }
-
-  private async recordActivity(projectId: string, actorId: string | undefined, action: ActivityAction, entityType: ActivityEntityType, entityId: Types.ObjectId, details: Record<string, unknown>) {
-    if (!actorId) return;
-    const project = await this.projectModel!.findById(projectId).select('organization_id').lean().exec();
-    if (!project?.organization_id) return;
-    await this.activityLogModel!.create({
-      organization_id: project.organization_id,
-      user_id: actorId,
-      action,
-      entity_type: entityType,
-      entity_id: entityId,
-      details,
-    });
-  }
-
-  async updateStage(taskId: string, workflowStageId: string) {
-    const task = await this.taskModel!.findByIdAndUpdate(taskId, { workflow_stage_id: workflowStageId }, { new: true }).exec();
-    return { success: true, data: task };
-  }
-
-  async updatePriority(taskId: string, priority: string) {
-    const task = await this.taskModel!.findByIdAndUpdate(taskId, { priority }, { new: true }).exec();
-    return { success: true, data: task };
-  }
-
-  async updateDueDate(taskId: string, dueDate: Date | null) {
-    const task = await this.taskModel!.findByIdAndUpdate(taskId, { due_date: dueDate }, { new: true }).exec();
-    return { success: true, data: task };
+  async updateStage(taskId: string, stageId: string) {
+    return {
+      success: true,
+      data: await this.taskModel!.findByIdAndUpdate(
+        taskId,
+        { workflow_stage_id: stageId },
+        { new: true },
+      ),
+    };
   }
 
   async listDependencies(taskId: string) {
-    const dependencies = await this.taskDependencyModel!.find({ task_id: taskId }).exec();
-    return { success: true, data: dependencies };
+    return {
+      success: true,
+      data: await this.depModel!.find({ task_id: taskId }),
+    };
   }
 
-  async createDependency(taskId: string, dependencyTaskId: string) {
-    const dependency = await this.taskDependencyModel!.create({
-      task_id: taskId,
-      depends_on_task_id: dependencyTaskId,
+  async createDependency(taskId: string, depTaskId: string) {
+    if (taskId === depTaskId)
+      throw new BadRequestException('Cannot depend on itself');
+    if (
+      await this.depModel!.findOne({
+        task_id: taskId,
+        depends_on_task_id: depTaskId,
+      })
+    ) {
+      throw new BadRequestException('Dependency already exists');
+    }
+    if (await this.hasCycle(taskId, depTaskId))
+      throw new BadRequestException('Would create circular dependency');
+    return {
+      success: true,
+      data: await this.depModel!.create({
+        task_id: taskId,
+        depends_on_task_id: depTaskId,
+      }),
+    };
+  }
+
+  async removeDependency(taskId: string, depTaskId: string) {
+    return {
+      success: true,
+      data: await this.depModel!.findOneAndDelete({
+        task_id: taskId,
+        depends_on_task_id: depTaskId,
+      }),
+    };
+  }
+
+  private async hasCycle(taskId: string, depTaskId: string): Promise<boolean> {
+    const visited = new Set<string>();
+    const queue = [depTaskId];
+    while (queue.length) {
+      const current = queue.shift()!;
+      if (current === taskId) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      const deps = await this.depModel!.find({ task_id: current })
+        .select('depends_on_task_id')
+        .lean();
+      deps.forEach((d) => queue.push(String(d.depends_on_task_id)));
+    }
+    return false;
+  }
+
+  private async logActivity(
+    projectId: string,
+    actorId: string | undefined,
+    action: string,
+    entityType: string,
+    entityId: Types.ObjectId,
+    details: Record<string, unknown>,
+  ) {
+    if (!actorId) return;
+    const project = await this.projectModel!.findById(projectId)
+      .select('organization_id')
+      .lean();
+    if (!project?.organization_id) return;
+    await this.activityModel!.create({
+      organization_id: project.organization_id,
+      user_id: actorId,
+      action: action as ActivityAction,
+      entity_type: entityType as ActivityEntityType,
+      entity_id: entityId,
+      details,
     });
-    return { success: true, data: dependency };
-  }
-
-  async removeDependency(taskId: string, dependencyTaskId: string) {
-    const dependency = await this.taskDependencyModel!.findOneAndDelete({ task_id: taskId, depends_on_task_id: dependencyTaskId }).exec();
-    return { success: true, data: dependency };
   }
 }

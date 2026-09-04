@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, Optional, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Optional,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../users/schemas/user.schema.js';
@@ -11,34 +16,42 @@ import { UserRole } from '../users/enums/users.enum.js';
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectModel(User.name) @Optional() private readonly userModel?: Model<User>,
+    @InjectModel(User.name)
+    @Optional()
+    private readonly userModel?: Model<User>,
     @Optional() private readonly jwtService?: JwtService,
-  ) { }
+  ) {}
 
   async create(user: CreateUserDto) {
     const normalizedEmail = user.email.trim().toLowerCase();
-    const existingUser = await this.userModel!.findOne({ email: normalizedEmail });
+    const existingUser = await this.userModel!.findOne({
+      email: normalizedEmail,
+    });
     if (existingUser) {
-      throw new ConflictException("User with this email already exists");
+      throw new ConflictException('User with this email already exists');
     }
     const hashPassword = await bcrypt.hash(user.password, 10);
-    const newUser = new this.userModel!({ ...user, email: normalizedEmail, password: hashPassword });
+    const newUser = new this.userModel!({
+      ...user,
+      email: normalizedEmail,
+      password: hashPassword,
+    });
     await newUser.save();
     return {
       success: true,
-      message: `user ${user.name} created successfully`
+      message: `user ${user.name} created successfully`,
     };
   }
-  
+
   async login(data: LoginDto) {
     const normalizedEmail = data.email.trim().toLowerCase();
     const user = await this.userModel!.findOne({ email: normalizedEmail });
     if (!user) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException('Invalid credentials');
     }
     const isPasswordValid = await bcrypt.compare(data.password, user.password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     const payload = {
@@ -47,7 +60,7 @@ export class AuthService {
       role: user.role,
       organization_id: user.organization_id,
     };
-    
+
     const token = this.jwtService!.sign(payload);
 
     return {
@@ -57,21 +70,23 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
-        organization_id: user.organization_id ? String(user.organization_id) : undefined,
+        organization_id: user.organization_id
+          ? String(user.organization_id)
+          : undefined,
       },
     };
   }
 
   async updateRole(role: UserRole) {
-    const user = await this.userModel!.findOne({ email: "harini@gmail.com" });
+    const user = await this.userModel!.findOne({ email: 'harini@gmail.com' });
     if (!user) {
-      throw new ConflictException("User not found");
+      throw new ConflictException('User not found');
     }
     user.role = role;
     await user.save();
     return {
       success: true,
-      message: `role updated to ${role}`
-    }
+      message: `role updated to ${role}`,
+    };
   }
 }

@@ -19,7 +19,6 @@ export enum ActivityEntityType {
 
 @Schema({ timestamps: { createdAt: true, updatedAt: false } })
 export class ActivityLog {
-
   @Prop({
     type: Types.ObjectId,
     ref: 'Organization',
@@ -61,5 +60,4 @@ export class ActivityLog {
   details: Record<string, any> | null;
 }
 
-export const ActivityLogSchema =
-  SchemaFactory.createForClass(ActivityLog);
+export const ActivityLogSchema = SchemaFactory.createForClass(ActivityLog);

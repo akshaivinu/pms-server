@@ -32,7 +32,8 @@ export class OrganizationsService {
   }
 
   async findOne(organizationId: string) {
-    const organization = await this.organizationModel!.findById(organizationId).exec();
+    const organization =
+      await this.organizationModel!.findById(organizationId).exec();
     if (!organization) {
       return { success: false, message: 'Organization not found' };
     }
@@ -41,9 +42,11 @@ export class OrganizationsService {
   }
 
   async update(organizationId: string, data: Partial<Organization>) {
-    const organization = await this.organizationModel!
-      .findByIdAndUpdate(organizationId, data, { new: true })
-      .exec();
+    const organization = await this.organizationModel!.findByIdAndUpdate(
+      organizationId,
+      data,
+      { new: true },
+    ).exec();
 
     return {
       success: true,

@@ -3,7 +3,6 @@ import { Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class Task {
-
   @Prop({
     type: Types.ObjectId,
     ref: 'Project',
@@ -18,7 +17,7 @@ export class Task {
   description: string;
 
   @Prop({
-    enum: ['low', 'medium', 'high'],
+    enum: ['low', 'medium', 'high', 'urgent'],
     default: 'medium',
   })
   priority: string;

@@ -19,7 +19,9 @@ import { type Request } from 'express';
 
 @Controller('projects')
 export class WorkflowsController {
-  constructor(@Optional() private readonly workflowsService?: WorkflowsService) {}
+  constructor(
+    @Optional() private readonly workflowsService?: WorkflowsService,
+  ) {}
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
@@ -29,14 +31,32 @@ export class WorkflowsController {
     @Body() data: Record<string, unknown>,
     @Req() request: Request,
   ) {
-    await this.workflowsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.organization_id);
-    return this.workflowsService!.createWorkflow(projectId, data);
+    const user = (request as any).user;
+    await this.workflowsService!.assertCanManage(
+      projectId,
+      user?.userId,
+      user?.organization_id,
+    );
+    return this.workflowsService!.createWorkflow(
+      projectId,
+      data,
+      user?.userId,
+      user?.organization_id,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
   @Get(':projectId/workflow')
-  async getWorkflow(@Param('projectId') projectId: string, @Req() request: Request) {
-    await this.workflowsService!.assertCanAccess(projectId, (request as any).user?.userId, (request as any).user?.role, (request as any).user?.organization_id);
+  async getWorkflow(
+    @Param('projectId') projectId: string,
+    @Req() request: Request,
+  ) {
+    await this.workflowsService!.assertCanAccess(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
     return this.workflowsService!.getWorkflow(projectId);
   }
 
@@ -48,7 +68,11 @@ export class WorkflowsController {
     @Body() data: Record<string, unknown>,
     @Req() request: Request,
   ) {
-    await this.workflowsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.organization_id);
+    await this.workflowsService!.assertCanManage(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.organization_id,
+    );
     return this.workflowsService!.updateWorkflow(projectId, data);
   }
 
@@ -60,7 +84,11 @@ export class WorkflowsController {
     @Body() data: { name: string; position: number },
     @Req() request: Request,
   ) {
-    await this.workflowsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.organization_id);
+    await this.workflowsService!.assertCanManage(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.organization_id,
+    );
     return this.workflowsService!.createStage(projectId, data);
   }
 
@@ -73,15 +101,27 @@ export class WorkflowsController {
     @Body() data: Record<string, unknown>,
     @Req() request: Request,
   ) {
-    await this.workflowsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.organization_id);
+    await this.workflowsService!.assertCanManage(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.organization_id,
+    );
     return this.workflowsService!.updateStage(stageId, data);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Delete(':projectId/workflow/stages/:stageId')
-  async deleteStage(@Param('projectId') projectId: string, @Param('stageId') stageId: string, @Req() request: Request) {
-    await this.workflowsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.organization_id);
+  async deleteStage(
+    @Param('projectId') projectId: string,
+    @Param('stageId') stageId: string,
+    @Req() request: Request,
+  ) {
+    await this.workflowsService!.assertCanManage(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.organization_id,
+    );
     return this.workflowsService!.deleteStage(stageId);
   }
 
@@ -93,7 +133,11 @@ export class WorkflowsController {
     @Body() body: Array<{ id: string; position: number }>,
     @Req() request: Request,
   ) {
-    await this.workflowsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.organization_id);
+    await this.workflowsService!.assertCanManage(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.organization_id,
+    );
     return this.workflowsService!.reorderStages(projectId, body);
   }
 }

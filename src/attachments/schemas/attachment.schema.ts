@@ -8,7 +8,6 @@ export enum AttachmentType {
 
 @Schema({ timestamps: { createdAt: true, updatedAt: false } })
 export class Attachment {
-
   @Prop({
     type: Types.ObjectId,
     ref: 'Task',
@@ -34,7 +33,7 @@ export class Attachment {
     default: null,
   })
   file_type: string | null;
-  
+
   @Prop({
     type: Number,
     default: null,
@@ -42,5 +41,4 @@ export class Attachment {
   file_size: number | null;
 }
 
-export const AttachmentSchema =
-  SchemaFactory.createForClass(Attachment);
+export const AttachmentSchema = SchemaFactory.createForClass(Attachment);

@@ -24,49 +24,72 @@ export class UsersController {
 
   private assertOrganization(organizationId: string, request: Request) {
     if ((request as any).user?.organization_id !== organizationId) {
-      throw new ForbiddenException('You do not have access to this organization');
+      throw new ForbiddenException(
+        'You do not have access to this organization',
+      );
     }
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @Get(':organizationId/users')
-  async listUsers(@Param('organizationId') organizationId: string, @Req() request: Request) {
+  async listUsers(
+    @Param('organizationId') organizationId: string,
+    @Req() request: Request,
+  ) {
     this.assertOrganization(organizationId, request);
-   return this.usersService!.listUsers(organizationId);
+    return this.usersService!.listUsers(organizationId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @Get(':organizationId/users/:userId')
-  async getUser(@Param('organizationId') organizationId: string, @Param('userId') userId: string, @Req() request: Request) {
+  async getUser(
+    @Param('organizationId') organizationId: string,
+    @Param('userId') userId: string,
+    @Req() request: Request,
+  ) {
     this.assertOrganization(organizationId, request);
-   return this.usersService!.findOne(organizationId, userId);
+    return this.usersService!.findOne(organizationId, userId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @Patch(':organizationId/users/:userId')
-  async updateUser(@Param('organizationId') organizationId: string, @Param('userId') userId: string, @Body() data: Record<string, unknown>, @Req() request: Request) {
+  async updateUser(
+    @Param('organizationId') organizationId: string,
+    @Param('userId') userId: string,
+    @Body() data: Record<string, unknown>,
+    @Req() request: Request,
+  ) {
     this.assertOrganization(organizationId, request);
-   return this.usersService!.update(organizationId, userId, data);
+    return this.usersService!.update(organizationId, userId, data);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @Patch(':organizationId/users/:userId/role')
-  async updateUserRole(@Param('organizationId') organizationId: string, @Param('userId') userId: string, @Body() body: { role: UserRole }, @Req() request: Request) {
+  async updateUserRole(
+    @Param('organizationId') organizationId: string,
+    @Param('userId') userId: string,
+    @Body() body: { role: UserRole },
+    @Req() request: Request,
+  ) {
     this.assertOrganization(organizationId, request);
-   return this.usersService!.updateRole(organizationId, userId, body.role);
+    return this.usersService!.updateRole(organizationId, userId, body.role);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @Delete(':organizationId/users/:userId')
   @HttpCode(200)
-  async deleteUser(@Param('organizationId') organizationId: string, @Param('userId') userId: string, @Req() req: Request) {
+  async deleteUser(
+    @Param('organizationId') organizationId: string,
+    @Param('userId') userId: string,
+    @Req() req: Request,
+  ) {
     this.assertOrganization(organizationId, req);
-   return this.usersService!.remove(organizationId, userId, (req as any).user);
+    return this.usersService!.remove(organizationId, userId, (req as any).user);
   }
 }
 

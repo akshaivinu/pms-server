@@ -11,7 +11,6 @@ export enum ProjectStatus {
 
 @Schema({ timestamps: true })
 export class Project {
-
   @Prop({
     type: Types.ObjectId,
     ref: 'Organization',

@@ -3,7 +3,6 @@ import { Types } from 'mongoose';
 
 @Schema({ timestamps: { createdAt: true, updatedAt: false } })
 export class Label {
-
   @Prop({
     type: Types.ObjectId,
     ref: 'Organization',

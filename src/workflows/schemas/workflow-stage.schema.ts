@@ -3,7 +3,6 @@ import { Types } from 'mongoose';
 
 @Schema({ timestamps: { createdAt: true, updatedAt: false } })
 export class WorkflowStage {
-
   @Prop({
     type: Types.ObjectId,
     ref: 'Workflow',
@@ -18,5 +17,4 @@ export class WorkflowStage {
   position: number;
 }
 
-export const WorkflowStageSchema =
-  SchemaFactory.createForClass(WorkflowStage);
+export const WorkflowStageSchema = SchemaFactory.createForClass(WorkflowStage);

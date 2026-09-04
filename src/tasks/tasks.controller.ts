@@ -29,14 +29,31 @@ export class TasksController {
     @Body() data: Record<string, any>,
     @Req() request: Request,
   ) {
-    await this.tasksService!.assertCanAccessProject(projectId, (request as any).user?.userId, (request as any).user?.role, (request as any).user?.organization_id);
-    return this.tasksService!.createTask(projectId, data, (request as any).user?.userId);
+    await this.tasksService!.assertCanAccessProject(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
+    return this.tasksService!.createTask(
+      projectId,
+      data,
+      (request as any).user?.userId,
+    );
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('projects/:projectId/tasks')
-  async listTasks(@Param('projectId') projectId: string, @Req() request: Request) {
-    await this.tasksService!.assertCanAccessProject(projectId, (request as any).user?.userId, (request as any).user?.role, (request as any).user?.organization_id);
+  async listTasks(
+    @Param('projectId') projectId: string,
+    @Req() request: Request,
+  ) {
+    await this.tasksService!.assertCanAccessProject(
+      projectId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
     return this.tasksService!.listTasks(projectId);
   }
 
@@ -46,15 +63,29 @@ export class TasksController {
     const task = await this.tasksService!.findTask(taskId);
     const taskData = task.data as any;
     if (!taskData) return task;
-    await this.tasksService!.assertCanAccessProject(String(taskData.project_id), (request as any).user?.userId, (request as any).user?.role, (request as any).user?.organization_id);
+    await this.tasksService!.assertCanAccessProject(
+      String(taskData.project_id),
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
     return this.tasksService!.findTask(taskId);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Patch('tasks/:taskId')
-  async updateTask(@Param('taskId') taskId: string, @Body() data: Record<string, any>, @Req() request: Request) {
-    await this.tasksService!.assertCanManageTask(taskId, (request as any).user?.userId, (request as any).user?.role);
+  async updateTask(
+    @Param('taskId') taskId: string,
+    @Body() data: Record<string, any>,
+    @Req() request: Request,
+  ) {
+    await this.tasksService!.assertCanManageTask(
+      taskId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
     return this.tasksService!.updateTask(taskId, data);
   }
 
@@ -62,7 +93,12 @@ export class TasksController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @Delete('tasks/:taskId')
   async deleteTask(@Param('taskId') taskId: string, @Req() request: Request) {
-    await this.tasksService!.assertCanManageTask(taskId, (request as any).user?.userId, (request as any).user?.role);
+    await this.tasksService!.assertCanManageTask(
+      taskId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
     return this.tasksService!.deleteTask(taskId);
   }
 
@@ -74,7 +110,17 @@ export class TasksController {
     @Body() body: { assigneeId?: string | null },
     @Req() request: Request,
   ) {
-    return this.tasksService!.updateAssignee(taskId, body.assigneeId ?? null, (request as any).user?.userId);
+    await this.tasksService!.assertCanAccessTask(
+      taskId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
+    return this.tasksService!.updateAssignee(
+      taskId,
+      body.assigneeId ?? null,
+      (request as any).user?.userId,
+    );
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -83,7 +129,14 @@ export class TasksController {
   async updateStage(
     @Param('taskId') taskId: string,
     @Body() body: { workflowStageId: string },
+    @Req() request: Request,
   ) {
+    await this.tasksService!.assertCanAccessTask(
+      taskId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
     return this.tasksService!.updateStage(taskId, body.workflowStageId);
   }
 
@@ -93,8 +146,15 @@ export class TasksController {
   async updatePriority(
     @Param('taskId') taskId: string,
     @Body() body: { priority: string },
+    @Req() request: Request,
   ) {
-    return this.tasksService!.updatePriority(taskId, body.priority);
+    await this.tasksService!.assertCanAccessTask(
+      taskId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
+    return this.tasksService!.updateTask(taskId, { priority: body.priority });
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -103,13 +163,31 @@ export class TasksController {
   async updateDueDate(
     @Param('taskId') taskId: string,
     @Body() body: { dueDate: string | null },
+    @Req() request: Request,
   ) {
-    return this.tasksService!.updateDueDate(taskId, body.dueDate ? new Date(body.dueDate) : null);
+    await this.tasksService!.assertCanAccessTask(
+      taskId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
+    return this.tasksService!.updateTask(taskId, {
+      due_date: body.dueDate ? new Date(body.dueDate) : null,
+    });
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('tasks/:taskId/dependencies')
-  async listDependencies(@Param('taskId') taskId: string) {
+  async listDependencies(
+    @Param('taskId') taskId: string,
+    @Req() request: Request,
+  ) {
+    await this.tasksService!.assertCanAccessTask(
+      taskId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
     return this.tasksService!.listDependencies(taskId);
   }
 
@@ -119,7 +197,14 @@ export class TasksController {
   async createDependency(
     @Param('taskId') taskId: string,
     @Body() body: { dependsOnTaskId: string },
+    @Req() request: Request,
   ) {
+    await this.tasksService!.assertCanAccessTask(
+      taskId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
     return this.tasksService!.createDependency(taskId, body.dependsOnTaskId);
   }
 
@@ -129,7 +214,14 @@ export class TasksController {
   async removeDependency(
     @Param('taskId') taskId: string,
     @Param('dependencyTaskId') dependencyTaskId: string,
+    @Req() request: Request,
   ) {
+    await this.tasksService!.assertCanAccessTask(
+      taskId,
+      (request as any).user?.userId,
+      (request as any).user?.role,
+      (request as any).user?.organization_id,
+    );
     return this.tasksService!.removeDependency(taskId, dependencyTaskId);
   }
 }
