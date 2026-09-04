@@ -52,7 +52,7 @@ export class AuthService {
   }
 
   async updateRole(role: UserRole) {
-    const user = await this.userModel!.findOne({ email: "vinu@gmail.com" });
+    const user = await this.userModel!.findOne({ email: "harini@gmail.com" });
     if (!user) {
       throw new ConflictException("User not found");
     }

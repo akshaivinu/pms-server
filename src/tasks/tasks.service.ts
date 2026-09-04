@@ -1,18 +1,51 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Task } from './schemas/task.schema.js';
 import { TaskDependency } from './schemas/task-dependency.schema.js';
+import { Workflow } from '../workflows/schemas/workflow.schema.js';
+import { WorkflowStage } from '../workflows/schemas/workflow-stage.schema.js';
 
 @Injectable()
 export class TasksService {
   constructor(
     @InjectModel(Task.name) @Optional() private readonly taskModel?: Model<Task>,
     @InjectModel(TaskDependency.name) @Optional() private readonly taskDependencyModel?: Model<TaskDependency>,
+    @InjectModel(Workflow.name) @Optional() private readonly workflowModel?: Model<Workflow>,
+    @InjectModel(WorkflowStage.name) @Optional() private readonly workflowStageModel?: Model<WorkflowStage>,
   ) {}
 
   async createTask(projectId: string, data: Partial<Task>) {
-    const task = await this.taskModel!.create({ project_id: projectId, ...data });
+    let workflowStageId = data.workflow_stage_id;
+    if (!workflowStageId) {
+      let workflow = await this.workflowModel!.findOne({ project_id: projectId }).exec();
+      if (!workflow) {
+        workflow = await this.workflowModel!.create({ project_id: projectId });
+      }
+
+      let firstStage = await this.workflowStageModel!
+        .findOne({ workflow_id: workflow._id })
+        .sort({ position: 1 })
+        .exec();
+      if (!firstStage) {
+        firstStage = await this.workflowStageModel!.create({
+          workflow_id: workflow._id,
+          name: 'To do',
+          position: 0,
+        });
+      }
+      workflowStageId = firstStage._id;
+    }
+
+    if (!workflowStageId) {
+      throw new BadRequestException('A workflow stage is required to create a task');
+    }
+
+    const task = await this.taskModel!.create({
+      project_id: projectId,
+      ...data,
+      workflow_stage_id: workflowStageId,
+    });
     return { success: true, data: task };
   }
 
