@@ -35,12 +35,14 @@ export class AuthController {
    @Body() data: LoginDto,
    @Res({ passthrough: true }) response: Response,
  ) {
+   response.clearCookie('accessToken', { path: '/' });
    const accessToken = await this.authService!.login(data);
 
    response.cookie('accessToken', accessToken, {
      httpOnly: true,
      secure: process.env.NODE_ENV === 'production',
-     sameSite: 'strict',
+     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+     path: '/',
      maxAge: 24 * 60 * 60 * 1000,
    });
 

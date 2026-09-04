@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Project } from './schemas/project.schema.js';
@@ -20,23 +20,33 @@ export class ProjectsService {
     private userModel?: Model<User>,
   ) {}
 
-  async create(name: string, description: string, organization_id: Types.ObjectId) {
+  async create(name: string, description: string, organization_id: Types.ObjectId, creatorId?: string, creatorRole?: string) {
     const project = await this.projectModel!.create({
       name,
       description,
       organization_id,
     });
 
+    if (creatorId && creatorRole === 'manager') {
+      await this.projectMemberModel!.create({
+        project_id: project._id,
+        user_id: creatorId,
+        project_role: 'PROJECT_MANAGER',
+      });
+    }
     return {
       success: true,
       data: project,
     };
   }
 
-  async findAll(organizationId?: Types.ObjectId) {
-    const projects = organizationId
-      ? await this.projectModel!.find({ organization_id: organizationId }).exec()
-      : await this.projectModel!.find().exec();
+  async findAll(organizationId: Types.ObjectId, userId?: string, role?: string) {
+    const filter: Record<string, unknown> = { organization_id: organizationId };
+    if (role === 'member') {
+      const memberships = await this.projectMemberModel!.find({ user_id: userId }).select('project_id').lean().exec();
+      filter._id = { $in: memberships.map((membership) => membership.project_id) };
+    }
+    const projects = await this.projectModel!.find(filter).exec();
 
     return { success: true, data: projects };
   }
@@ -52,6 +62,27 @@ export class ProjectsService {
     }
 
     return { success: true, data: project };
+  }
+
+  async assertCanAccess(projectId: Types.ObjectId, userId: string, role: string) {
+    if (role === 'admin' || role === 'manager') return;
+    const membership = await this.projectMemberModel!.findOne({ project_id: projectId, user_id: userId }).lean().exec();
+    if (!membership) throw new ForbiddenException('You do not have access to this project');
+  }
+
+  async assertProjectOrganization(projectId: Types.ObjectId, organizationId: string) {
+    const project = await this.projectModel!.findOne({ _id: projectId, organization_id: organizationId }).select('_id').lean().exec();
+    if (!project) throw new ForbiddenException('You do not have access to this project');
+  }
+
+  async assertCanManage(projectId: Types.ObjectId, userId: string, role: string) {
+    if (role === 'admin') return;
+    const membership = await this.projectMemberModel!.findOne({
+      project_id: projectId,
+      user_id: userId,
+      project_role: { $in: ['MANAGER', 'PROJECT_MANAGER', 'manager', 'project_manager'] },
+    }).lean().exec();
+    if (!membership) throw new ForbiddenException('You cannot manage this project');
   }
 
   async update(projectId: Types.ObjectId, data: Record<string, unknown>) {

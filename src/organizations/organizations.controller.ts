@@ -1,6 +1,7 @@
 import {
  Body,
  Controller,
+ ForbiddenException,
  Get,
  HttpCode,
  Optional,
@@ -39,7 +40,10 @@ export class OrganizationsController {
 
  @UseGuards(JwtAuthGuard)
  @Get(':organizationId')
- async getOrganization(@Param('organizationId') organizationId: string) {
+ async getOrganization(@Param('organizationId') organizationId: string, @Req() req: Request) {
+   if ((req as any).user?.organization_id !== organizationId) {
+     throw new ForbiddenException('You do not have access to this organization');
+   }
    return this.organizationsService!.findOne(organizationId);
  }
 
@@ -49,7 +53,11 @@ export class OrganizationsController {
  async updateOrganization(
    @Param('organizationId') organizationId: string,
    @Body() data: Partial<Organization>,
+   @Req() req: Request,
  ) {
+   if ((req as any).user?.organization_id !== organizationId) {
+     throw new ForbiddenException('You do not have access to this organization');
+   }
    return this.organizationsService!.update(organizationId, data);
  }
 }

@@ -30,7 +30,7 @@ export class AuthService {
   }
   
   async login(data: LoginDto) {
-    const user = await this.userModel!.findOne({ email: data.email })
+    const user = await this.userModel!.findOne({ email: data.email.trim().toLowerCase() })
     if (!user) {
       throw new ConflictException("User with this email does not exist");
     }

@@ -42,6 +42,8 @@ export class ProjectsController {
       data.name,
       data.description,
       new Types.ObjectId(organizationId),
+      (request as any).user?.userId,
+      (request as any).user?.role,
     );
   }
 
@@ -53,7 +55,7 @@ export class ProjectsController {
       throw new BadRequestException('User does not belong to an organization');
     }
     const organizationObjectId = new Types.ObjectId(organizationId);
-    return this.projectsService!.findAll(organizationObjectId);
+    return this.projectsService!.findAll(organizationObjectId, (request as any).user?.userId, (request as any).user?.role);
   }
 
   @Get(':projectId')
@@ -67,7 +69,9 @@ export class ProjectsController {
       throw new BadRequestException('User does not belong to an organization');
     }
 
-    return this.projectsService!.findOne(new Types.ObjectId(projectId), new Types.ObjectId(organizationId));
+    const projectObjectId = new Types.ObjectId(projectId);
+    await this.projectsService!.assertCanAccess(projectObjectId, (request as any).user?.userId, (request as any).user?.role);
+    return this.projectsService!.findOne(projectObjectId, new Types.ObjectId(organizationId));
   }
 
   @Patch(':projectId')
@@ -76,27 +80,34 @@ export class ProjectsController {
   async updateProject(
     @Param('projectId') projectId: Types.ObjectId,
     @Body() data: Record<string, unknown>,
+    @Req() request: Request,
   ) {
+    await this.projectsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.role);
     return this.projectsService!.update(projectId, data);
   }
 
   @Delete(':projectId')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async deleteProject(@Param('projectId') projectId: Types.ObjectId) {
+  async deleteProject(@Param('projectId') projectId: Types.ObjectId, @Req() request: Request) {
+    await this.projectsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.role);
     return this.projectsService!.remove(projectId);
   }
 
   @Post(':projectId/archive')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async archiveProject(@Param('projectId') projectId: Types.ObjectId) {
+  async archiveProject(@Param('projectId') projectId: Types.ObjectId, @Req() request: Request) {
+    await this.projectsService!.assertCanManage(projectId, (request as any).user?.userId, (request as any).user?.role);
     return this.projectsService!.archive(projectId);
   }
 
   @Get(':projectId/members')
   @UseGuards(JwtAuthGuard)
-  async listProjectMembers(@Param('projectId') projectId: string) {
+  async listProjectMembers(@Param('projectId') projectId: string, @Req() request: Request) {
+    const organizationId = (request as any).user?.organization_id;
+    if (!organizationId) throw new BadRequestException('User does not belong to an organization');
+    await this.projectsService!.assertProjectOrganization(new Types.ObjectId(projectId), organizationId);
     return this.projectsService!.listMembers(new Types.ObjectId(projectId));
   }
 

@@ -10,6 +10,9 @@ export class Workflow {
     required: true,
   })
   project_id: Types.ObjectId;
+
+  @Prop({ required: true, default: 'Default workflow' })
+  name: string;
 }
 
 export const WorkflowSchema = SchemaFactory.createForClass(Workflow);
