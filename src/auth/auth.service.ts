@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Optional } from '@nestjs/common';
+import { ConflictException, Injectable, Optional, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../users/schemas/user.schema.js';
@@ -16,27 +16,29 @@ export class AuthService {
   ) { }
 
   async create(user: CreateUserDto) {
-    const existingUser = await this.userModel!.findOne({ email: user.email });
+    const normalizedEmail = user.email.trim().toLowerCase();
+    const existingUser = await this.userModel!.findOne({ email: normalizedEmail });
     if (existingUser) {
       throw new ConflictException("User with this email already exists");
     }
     const hashPassword = await bcrypt.hash(user.password, 10);
-    const newUser = new this.userModel!({ ...user, password: hashPassword });
-    newUser.save();
+    const newUser = new this.userModel!({ ...user, email: normalizedEmail, password: hashPassword });
+    await newUser.save();
     return {
       success: true,
       message: `user ${user.name} created successfully`
-    }
+    };
   }
   
   async login(data: LoginDto) {
-    const user = await this.userModel!.findOne({ email: data.email.trim().toLowerCase() })
+    const normalizedEmail = data.email.trim().toLowerCase();
+    const user = await this.userModel!.findOne({ email: normalizedEmail });
     if (!user) {
-      throw new ConflictException("User with this email does not exist");
+      throw new UnauthorizedException("Invalid credentials");
     }
-    const isPasswordValid = await bcrypt.compare(data.password, user.password)
+    const isPasswordValid = await bcrypt.compare(data.password, user.password);
     if (!isPasswordValid) {
-      throw new ConflictException("Invalid password");
+      throw new UnauthorizedException("Invalid credentials");
     }
 
     const payload = {
@@ -44,11 +46,20 @@ export class AuthService {
       email: user.email,
       role: user.role,
       organization_id: user.organization_id,
-    }
+    };
     
     const token = this.jwtService!.sign(payload);
 
-    return token;
+    return {
+      token,
+      user: {
+        id: String(user._id),
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        organization_id: user.organization_id ? String(user.organization_id) : undefined,
+      },
+    };
   }
 
   async updateRole(role: UserRole) {

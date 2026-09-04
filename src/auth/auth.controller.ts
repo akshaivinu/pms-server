@@ -36,7 +36,9 @@ export class AuthController {
    @Res({ passthrough: true }) response: Response,
  ) {
    response.clearCookie('accessToken', { path: '/' });
-   const accessToken = await this.authService!.login(data);
+   const result = await this.authService!.login(data);
+   const accessToken = typeof result === 'string' ? result : result.token;
+   const user = typeof result === 'string' ? undefined : result.user;
 
    response.cookie('accessToken', accessToken, {
      httpOnly: true,
@@ -50,6 +52,7 @@ export class AuthController {
      success: true,
      message: 'Login successful',
      token: accessToken,
+     ...(user ? { user } : {}),
    };
  }
 

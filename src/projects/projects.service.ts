@@ -151,10 +151,21 @@ export class ProjectsService {
   }
 
   async updateMember(projectId: Types.ObjectId, userId: string, projectRole: string) {
-    return { success: true, data: { projectId, userId, project_role: projectRole } };
+    const updated = await this.projectMemberModel!.findOneAndUpdate(
+      { project_id: projectId, user_id: userId },
+      { project_role: projectRole },
+      { new: true },
+    )
+      .populate('user_id', 'name email role organization_id')
+      .exec();
+    return { success: true, data: updated };
   }
 
   async removeMember(projectId: Types.ObjectId, userId: string) {
-    return { success: true, data: { projectId, userId, removed: true } };
+    const removed = await this.projectMemberModel!.findOneAndDelete({
+      project_id: projectId,
+      user_id: userId,
+    }).exec();
+    return { success: true, data: removed };
   }
 }

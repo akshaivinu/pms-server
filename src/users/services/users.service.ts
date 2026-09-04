@@ -9,7 +9,7 @@ export class UsersService {
   constructor(@InjectModel(User.name) @Optional() private userModel?: Model<User>) {}
 
   async listUsers(organizationId: string) {
-    const users = await this.userModel!.find({ organization_id: organizationId }).exec();
+    const users = await this.userModel!.find({ organization_id: organizationId }).select('-password').exec();
     return { success: true, data: users };
   }
 
@@ -17,7 +17,7 @@ export class UsersService {
     const user = await this.userModel!.findOne({
       _id: userId,
       organization_id: organizationId,
-    });
+    }).select('-password').exec();
 
     return {
       success: !!user,
